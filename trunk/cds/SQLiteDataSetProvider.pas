@@ -58,12 +58,13 @@ type
     class procedure CheckError(Erro: Integer);
     class procedure ExecuteSQL(const SQL: String);
     class procedure PrepareSQL(const SQL: String; var Stmt: TSQLiteStmt);
+    class function GetTableName(DataSet: TDataSet): String;
+    class procedure SetFieldData(FInsertStmt: TSQLiteStmt; Field: TField);
   end;
 
   TSiagriDataPacketWriter = class(TDataPacketWriter)
   private
     FDataSetToSQLiteBind: TDataSetToSQLiteBind;
-    procedure SetFieldData(FInsertStmt: TSQLiteStmt; Field: TField);
   protected
     procedure AddColumn(const Info: TPutFieldInfo); override;
     procedure AddConstraints(DataSet: TDataSet); override;
@@ -182,10 +183,22 @@ var
   I: Integer;
 begin
   Result := '';
-
   for I := 0 to FieldDefs.Count - 1 do
     with FieldDefs[I] do
       Result := Result + Format('%s %s, ', [Name, GetStrDataType(DataType)]);
+end;
+
+class function TSQLiteAux.GetTableName(DataSet: TDataSet): String;
+var
+  Owner: TComponent;
+begin
+  Owner := DataSet.Owner;
+  Result := DataSet.Name;
+  while (Owner <> nil) and (Owner.Name <> '') do
+  begin
+    Result := Owner.Name + '_' + Result;
+    Owner := Owner.Owner;
+  end;
 end;
 
 class procedure TSQLiteAux.PrepareSQL(const SQL: String; var Stmt: TSQLiteStmt);
@@ -194,6 +207,72 @@ var
 begin
   SQL8 := UTF8String(SQL);
   CheckError(SQLite3_Prepare_v2(Database, @SQL8[1], -1, Stmt, FIgnore));
+end;
+
+class procedure TSQLiteAux.SetFieldData(FInsertStmt: TSQLiteStmt;
+  Field: TField);
+var
+  pindex: Integer;
+  //pname: AnsiString;
+  TimeStamp: TTimeStamp;
+  s8: AnsiString;
+begin
+  inherited;
+  //pname := ':' + Field.FieldName;
+  //pindex := SQLite3_Bind_Parameter_Index(FInsertStmt, PAnsiChar(pname));
+  pindex := Field.Index + 1;
+
+  if Field.IsNull then
+    TSQLiteAux.CheckError(SQLite3_Bind_null(FInsertStmt, pindex))
+  else
+  case Field.DataType of
+    ftString, ftWideString:
+    begin
+       s8 := Field.AsAnsiString;
+       TSQLiteAux.CheckError(SQLite3_Bind_text(FInsertStmt, pindex,
+         @s8[1], -1, SQLITE_TRANSIENT));
+    end;
+
+    ftOraBlob, ftOraClob, ftBytes, ftVarBytes, ftBlob, ftMemo, ftGraphic, ftFmtMemo:
+       TSQLiteAux.CheckError(SQLite3_Bind_Blob(FInsertStmt, pindex,
+         {$IFDEF VER180}PAnsiChar(Field.AsAnsiString)
+         {$ELSE}@Field.AsBytes[0]
+         {$ENDIF}, Length(Field.AsString), nil));
+
+    ftSmallint, ftInteger, ftWord, ftBoolean:
+       TSQLiteAux.CheckError(SQLite3_BindInt(FInsertStmt, pindex,
+         Field.AsInteger));
+
+    ftLargeint:
+       TSQLiteAux.CheckError(SQLite3_Bind_int64(FInsertStmt, pindex,
+         Field.AsInteger));
+
+    ftTime:
+    begin
+      TimeStamp := DateTimeToTimeStamp(Field.AsDateTime);
+      TSQLiteAux.CheckError(SQLite3_BindInt(FInsertStmt, pindex,
+         TimeStamp.Time));
+    end;
+
+    ftDate:
+    begin
+      TimeStamp := DateTimeToTimeStamp(Field.AsDateTime);
+      TSQLiteAux.CheckError(SQLite3_BindInt(FInsertStmt, pindex,
+         TimeStamp.Date));
+    end;
+
+    ftDateTime, ftTimeStamp,
+    ftFloat, ftCurrency:
+       TSQLiteAux.CheckError(SQLite3_Bind_Double(FInsertStmt, pindex,
+         Field.AsFloat));
+
+    ftBCD:
+       TSQLiteAux.CheckError(SQLite3_Bind_Double(FInsertStmt, pindex,
+         Field.AsFloat));
+
+    else
+      raise Exception.Create('Field type not supported');
+  end;
 end;
 
 { TSiagriDataPacketWriter }
@@ -313,7 +392,7 @@ begin
       aux := GetTickCount;
       for i := 0 to count - 1 do
       begin
-        SetFieldData(Rec.InsertStmt, DataSet.Fields[i]);
+        TSQLiteAux.SetFieldData(Rec.InsertStmt, DataSet.Fields[i]);
       end;
       s[1] := s[1] + (GetTickCount - aux);
 
@@ -340,71 +419,6 @@ begin
   end;
 end;
 
-procedure TSiagriDataPacketWriter.SetFieldData(FInsertStmt: TSQLiteStmt; Field: TField);
-var
-  pindex: Integer;
-  //pname: AnsiString;
-  TimeStamp: TTimeStamp;
-  s8: AnsiString;
-begin
-  inherited;
-  //pname := ':' + Field.FieldName;
-  //pindex := SQLite3_Bind_Parameter_Index(FInsertStmt, PAnsiChar(pname));
-  pindex := Field.Index + 1;
-
-  if Field.IsNull then
-    TSQLiteAux.CheckError(SQLite3_Bind_null(FInsertStmt, pindex))
-  else
-  case Field.DataType of
-    ftString, ftWideString:
-    begin
-       s8 := Field.AsAnsiString;
-       TSQLiteAux.CheckError(SQLite3_Bind_text(FInsertStmt, pindex,
-         @s8[1], -1, SQLITE_TRANSIENT));
-    end;
-
-    ftOraBlob, ftOraClob, ftBytes, ftVarBytes, ftBlob, ftMemo, ftGraphic, ftFmtMemo:
-       TSQLiteAux.CheckError(SQLite3_Bind_Blob(FInsertStmt, pindex,
-         {$IFDEF VER180}PAnsiChar(Field.AsAnsiString)
-         {$ELSE}@Field.AsBytes[0]
-         {$ENDIF}, Length(Field.AsString), nil));
-
-    ftSmallint, ftInteger, ftWord, ftBoolean:
-       TSQLiteAux.CheckError(SQLite3_BindInt(FInsertStmt, pindex,
-         Field.AsInteger));
-
-    ftLargeint:
-       TSQLiteAux.CheckError(SQLite3_Bind_int64(FInsertStmt, pindex,
-         Field.AsInteger));
-
-    ftTime:
-    begin
-      TimeStamp := DateTimeToTimeStamp(Field.AsDateTime);
-      TSQLiteAux.CheckError(SQLite3_BindInt(FInsertStmt, pindex,
-         TimeStamp.Time));
-    end;
-
-    ftDate:
-    begin
-      TimeStamp := DateTimeToTimeStamp(Field.AsDateTime);
-      TSQLiteAux.CheckError(SQLite3_BindInt(FInsertStmt, pindex,
-         TimeStamp.Date));
-    end;
-
-    ftDateTime, ftTimeStamp,
-    ftFloat, ftCurrency:
-       TSQLiteAux.CheckError(SQLite3_Bind_Double(FInsertStmt, pindex,
-         Field.AsFloat));
-
-    ftBCD:
-       TSQLiteAux.CheckError(SQLite3_Bind_Double(FInsertStmt, pindex,
-         Field.AsFloat));
-
-    else
-      raise Exception.Create('Field type not supported');
-  end;
-end;
-
 procedure TSiagriDataPacketWriter.WriteMetaData(DataSet: TDataSet; const Info: TInfoArray; IsReference: Boolean);
 begin
 end;
@@ -428,20 +442,6 @@ begin
 end;
 
 function TDataSetToSQLiteBind.GetBinding(DataSet: TDataSet): PInsertSQLiteRec;
-
-  function GetTableName: String;
-  var
-    Owner: TComponent;
-  begin
-    Owner := DataSet.Owner;
-    Result := DataSet.Name;
-    while (Owner <> nil) and (Owner.Name <> '') do
-    begin
-      Result := Owner.Name + '_' + Result;
-      Owner := Owner.Owner;
-    end;
-  end;
-
 var
   i: Integer;
   Rec: PInsertSQLiteRec;
@@ -449,6 +449,9 @@ var
   List: TList;
   Params: TParams;
 begin
+  if DataSet.FieldDefs.Count = 0 then
+    raise Exception.Create('No fields in dataset.');
+
   for i := 0 to FBindings.Count - 1 do
     if (PInsertSQLiteRec(FBindings[i]).DataSet = DataSet) then
     begin
@@ -457,7 +460,7 @@ begin
     end;
 
   Rec := AllocMem(sizeof(TInsertSQLiteRec));
-  Rec.Table := GetTableName;
+  Rec.Table := TSQLiteAux.GetTableName(DataSet);
   Rec.DataSet := DataSet;
   Rec.FieldsDefs := TFieldDefs.Create(DataSet);
   Rec.FieldsDefs.Assign(DataSet.FieldDefs);
@@ -470,7 +473,7 @@ begin
 
   Params := IProviderSupport(DataSet).PSGetParams;
   Rec.Params := Params;
-  if Params.Count > 0 then
+  if Assigned(Params) and (Params.Count > 0) then
   begin
     CreateSQL := Format('create index idx_pars_%s on %s(', [Rec.Table, Rec.Table]);
     for i := 0 to Params.Count - 1 do

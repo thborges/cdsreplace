@@ -9,6 +9,9 @@
 			<Projects Include="Project10.dproj">
 				<Dependencies/>
 			</Projects>
+			<Projects Include="CuboTest.dproj">
+				<Dependencies/>
+			</Projects>
 		</ItemGroup>
 		<ProjectExtensions>
 			<Borland.Personality>Default.Personality.12</Borland.Personality>
@@ -35,14 +38,23 @@
 		<Target Name="Project10:Make">
 			<MSBuild Targets="Make" Projects="Project10.dproj"/>
 		</Target>
+		<Target Name="CuboTest">
+			<MSBuild Projects="CuboTest.dproj"/>
+		</Target>
+		<Target Name="CuboTest:Clean">
+			<MSBuild Targets="Clean" Projects="CuboTest.dproj"/>
+		</Target>
+		<Target Name="CuboTest:Make">
+			<MSBuild Targets="Make" Projects="CuboTest.dproj"/>
+		</Target>
 		<Target Name="Build">
-			<CallTarget Targets="Project1;Project10"/>
+			<CallTarget Targets="Project1;Project10;CuboTest"/>
 		</Target>
 		<Target Name="Clean">
-			<CallTarget Targets="Project1:Clean;Project10:Clean"/>
+			<CallTarget Targets="Project1:Clean;Project10:Clean;CuboTest:Clean"/>
 		</Target>
 		<Target Name="Make">
-			<CallTarget Targets="Project1:Make;Project10:Make"/>
+			<CallTarget Targets="Project1:Make;Project10:Make;CuboTest:Make"/>
 		</Target>
 		<Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 	</Project>
