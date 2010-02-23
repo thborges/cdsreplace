@@ -45,6 +45,7 @@ type
     FMasterLink: TMasterDataLink;
     FLocalDataSetToSQLiteBind: TDataSetToSQLiteBind;
     PDataSetRec: PInsertSQLiteRec;
+    FLastBindedFieldData: array of Variant;
     function GetDataSetProvider: TSQLiteDataSetProvider;
     procedure SetDataSetProvider(const Value: TSQLiteDataSetProvider);
     procedure DoAfterGetRecords(var OwnerData: OleVariant);
@@ -89,6 +90,7 @@ type
     function GetSQLiteTableName: String;
     procedure SetDataSetField(const Value: TDataSetField); override;
     procedure CreateDataSetFromFields;
+    procedure InternalInsert; override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -206,9 +208,20 @@ var
   s: PAnsiChar;
   //fname: AnsiString;
 begin
-  Result := OpenCurrentRecord;
-  //fname := UTF8String(Field.FieldName);
   index := Field.Index;
+  Result := OpenCurrentRecord;
+  if not Result and (State = dsInsert) then
+  begin
+    with TVarData(FLastBindedFieldData[index]) do
+    case VType of
+      varInteger: PInteger(Buffer)^ := Vinteger;
+      varString: PAnsiChar(Buffer)^ := AnsiChar(vstring);
+    end;
+    Result := True;
+    Exit;
+  end;
+
+  //fname := UTF8String(Field.FieldName);
   if not Result or (Sqlite3_ColumnType(FSelectOneStmt, index) = SQLITE_NULL) then
   begin
     Result := False;
@@ -298,7 +311,13 @@ begin
 
       gmCurrent:
         if (FActualRecordId <= 0) or (FActualRecordId > RecordCount) then
-          Result := grError;
+          Result := grError
+        else
+        if not Assigned(FCurrentRec) then
+        begin
+          FCurrentRec := FRootRow;
+          FActualRecordId := 1;
+        end;
     end;
   end;
 end;
@@ -318,7 +337,7 @@ var
   FCur: PRecordNode;
 begin
   FCur := PRecordBuffer(ActiveBuffer).Node;
-  Result := FCur.Id > 0;
+  Result := Assigned(FCur) and (FCur.Id > 0);
   if not Result then
     Exit;
 
@@ -473,6 +492,15 @@ begin
     SQLite3_Bind_null(PDataSetRec.InsertStmt, i);
 end;
 
+procedure TSQLiteClientDataSet.InternalInsert;
+var
+  i: Integer;
+begin
+  inherited;
+  for i := 0 to Length(FLastBindedFieldData) - 1 do
+    FLastBindedFieldData[i] := null;
+end;
+
 procedure TSQLiteClientDataSet.InternalLast;
 begin
   inherited;
@@ -502,6 +530,7 @@ begin
   FieldDefList.Update;
   if DefaultFields then CreateFields;
   BindFields(True);
+  SetLength(FLastBindedFieldData, Fields.Count);
 end;
 
 procedure TSQLiteClientDataSet.InternalPost;
@@ -509,7 +538,7 @@ var
   rowid: Int64;
 begin
   TSQLiteAux.CheckError(Sqlite3_Step(PDataSetRec.InsertStmt));
-  rowid := SQLite3_LastInsertRowID(Database);
+  //rowid := SQLite3_LastInsertRowID(Database);
 
   if State = dsInsert then
   begin
@@ -823,8 +852,6 @@ procedure TSQLiteClientDataSet.SetFieldData(Field: TField; Buffer: Pointer; Nati
 var
   pindex: Integer;
   //pname: AnsiString;
-  TimeStamp: TTimeStamp;
-  s8: AnsiString;
 begin
   inherited;
   //pname := ':' + Field.FieldName;
@@ -839,6 +866,7 @@ begin
     begin
        TSQLiteAux.CheckError(SQLite3_Bind_text(PDataSetRec.InsertStmt, pindex,
          Buffer, -1, SQLITE_TRANSIENT));
+       FLastBindedFieldData[pindex-1] := AnsiString(PAnsiChar(Buffer));
     end;
 
     ftOraBlob, ftOraClob, ftBytes, ftVarBytes, ftBlob, ftMemo, ftGraphic, ftFmtMemo:
@@ -846,8 +874,11 @@ begin
          Buffer, sizeof(Buffer), nil));
 
     ftSmallint, ftInteger, ftWord, ftBoolean:
+    begin
        TSQLiteAux.CheckError(SQLite3_BindInt(PDataSetRec.InsertStmt, pindex,
          PInteger(Buffer)^));
+       FLastBindedFieldData[pindex-1] := PInteger(Buffer)^;
+    end;
 
     ftTime:
        TSQLiteAux.CheckError(SQLite3_BindInt(PDataSetRec.InsertStmt, pindex,
