@@ -288,7 +288,7 @@ type
     { Private declarations }
   public
     lNomeIndexFields: String;
-    lQtdeCampos: Integer;
+    lQtdeCampos, AuxTime, TotTime: Integer;
     lNomeFields, lValueFields: Variant;
   end;
 
@@ -636,6 +636,7 @@ begin
             lNomeIndexFields, lNomeFields, lValueFields, lQtdeCampos, doc_Serie);
 
     cdsVendas.Locate(lNomeIndexFields, lValueFields, []);
+
     while CheckDados do
     begin
        //Application.ProcessaMsg;
@@ -743,7 +744,9 @@ begin
           end;
        end;
 
+       AuxTime := GetTickCount;
        cdsVendas.Delete;
+       TotTime := TotTime + (GetTickCount - AuxTime);
     end;
 end;
 
@@ -786,7 +789,7 @@ begin
      cdsVendas.IndexFieldNames := lNomeIndexFields;
 
      ProgressBar.Visible := True;
-     ProgressBar.Min     := 1;
+     ProgressBar.Min     := 0;
 
      if cdsVendas.RecordCount >= 1 then
         ProgressBar.Max := cdsVendas.RecordCount
@@ -915,23 +918,33 @@ begin
 end;
 
 procedure TForm2.Button1Click(Sender: TObject);
+var
+  a: Int64;
 begin
+  a := GetTickCount;
   cdsTemp.CreateDataSet;
   cdsVendas.Open;
+  cdsVendas.LogChanges := False;
   AtualizaValores;
+  ShowMessage(IntToStr(GetTickCount - a) + '-' + IntToStr(TotTime));
 end;
 
 procedure TForm2.Button2Click(Sender: TObject);
+var
+  a: Int64;
 begin
+  a := GetTickCount;
   sqcTemp.CreateDataSet;
   sqcVendas.Open;
   AtualizaValores2;
+  ShowMessage(IntToStr(GetTickCount - a) + '-' + IntToStr(TotTime));
 end;
 
 procedure TForm2.FormCreate(Sender: TObject);
 var
   lIndex: Integer;
 begin
+   TotTime := 0;
    for lIndex := 0 to clbEntidades.Count - 1 do
    begin
       if (clbEntidades.Items[lIndex] = 'Empresas') or
@@ -987,7 +1000,7 @@ begin
      sqcVendas.IndexFieldNames := lNomeIndexFields;
 
      ProgressBar.Visible := True;
-     ProgressBar.Min     := 1;
+     ProgressBar.Min     := 0;
 
      if sqcVendas.RecordCount >= 1 then
         ProgressBar.Max := sqcVendas.RecordCount
@@ -1152,6 +1165,7 @@ begin
             lNomeIndexFields, lNomeFields, lValueFields, lQtdeCampos, doc_Serie);
 
     sqcVendas.Locate(lNomeIndexFields, lValueFields, []);
+
     while CheckDados do
     begin
        //Application.ProcessaMsg;
@@ -1259,7 +1273,9 @@ begin
           end;
        end;
 
+       AuxTime := GetTickCount;
        sqcVendas.Delete;
+       TotTime := TotTime + (GetTickCount - AuxTime);
     end;
 end;
 

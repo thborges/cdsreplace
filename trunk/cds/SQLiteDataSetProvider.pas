@@ -143,7 +143,7 @@ var
 begin
   if not (Erro in [SQLITE_DONE, SQLITE_OK]) then
   begin
-    S := SQLite3_ErrMsg(Database);
+    S := _SQLite3_ErrMsg(Database);
     raise Exception.Create(String(UTF8String(S)));
   end;
 end;
@@ -153,7 +153,7 @@ var
   SQL8: UTF8String;
 begin
   SQL8 := UTF8String(SQL);
-  CheckError(SQLite3_Exec(Database, @SQL8[1], nil, nil, FIgnore));
+  CheckError(_SQLite3_Exec(Database, @SQL8[1], nil, nil, FIgnore));
 end;
 
 function GetStrDataType(DataType: TFieldType): String;
@@ -206,7 +206,7 @@ var
   SQL8: UTF8String;
 begin
   SQL8 := UTF8String(SQL);
-  CheckError(SQLite3_Prepare_v2(Database, @SQL8[1], -1, Stmt, FIgnore));
+  CheckError(_SQLite3_Prepare_v2(Database, @SQL8[1], -1, Stmt, FIgnore));
 end;
 
 class procedure TSQLiteAux.SetFieldData(FInsertStmt: TSQLiteStmt;
@@ -219,55 +219,55 @@ var
 begin
   inherited;
   //pname := ':' + Field.FieldName;
-  //pindex := SQLite3_Bind_Parameter_Index(FInsertStmt, PAnsiChar(pname));
+  //pindex := _SQLite3_Bind_Parameter_Index(FInsertStmt, PAnsiChar(pname));
   pindex := Field.Index + 1;
 
   if Field.IsNull then
-    TSQLiteAux.CheckError(SQLite3_Bind_null(FInsertStmt, pindex))
+    TSQLiteAux.CheckError(_SQLite3_Bind_null(FInsertStmt, pindex))
   else
   case Field.DataType of
     ftString, ftWideString:
     begin
        s8 := Field.AsAnsiString;
-       TSQLiteAux.CheckError(SQLite3_Bind_text(FInsertStmt, pindex,
+       TSQLiteAux.CheckError(_SQLite3_Bind_text(FInsertStmt, pindex,
          @s8[1], -1, SQLITE_TRANSIENT));
     end;
 
     ftOraBlob, ftOraClob, ftBytes, ftVarBytes, ftBlob, ftMemo, ftGraphic, ftFmtMemo:
-       TSQLiteAux.CheckError(SQLite3_Bind_Blob(FInsertStmt, pindex,
+       TSQLiteAux.CheckError(_SQLite3_Bind_Blob(FInsertStmt, pindex,
          {$IFDEF VER180}PAnsiChar(Field.AsAnsiString)
          {$ELSE}@Field.AsBytes[0]
          {$ENDIF}, Length(Field.AsString), nil));
 
     ftSmallint, ftInteger, ftWord, ftBoolean:
-       TSQLiteAux.CheckError(SQLite3_BindInt(FInsertStmt, pindex,
+       TSQLiteAux.CheckError(_SQLite3_Bind_Int(FInsertStmt, pindex,
          Field.AsInteger));
 
     ftLargeint:
-       TSQLiteAux.CheckError(SQLite3_Bind_int64(FInsertStmt, pindex,
+       TSQLiteAux.CheckError(_SQLite3_Bind_int64(FInsertStmt, pindex,
          Field.AsInteger));
 
     ftTime:
     begin
       TimeStamp := DateTimeToTimeStamp(Field.AsDateTime);
-      TSQLiteAux.CheckError(SQLite3_BindInt(FInsertStmt, pindex,
+      TSQLiteAux.CheckError(_SQLite3_Bind_Int(FInsertStmt, pindex,
          TimeStamp.Time));
     end;
 
     ftDate:
     begin
       TimeStamp := DateTimeToTimeStamp(Field.AsDateTime);
-      TSQLiteAux.CheckError(SQLite3_BindInt(FInsertStmt, pindex,
+      TSQLiteAux.CheckError(_SQLite3_Bind_Int(FInsertStmt, pindex,
          TimeStamp.Date));
     end;
 
     ftDateTime, ftTimeStamp,
     ftFloat, ftCurrency:
-       TSQLiteAux.CheckError(SQLite3_Bind_Double(FInsertStmt, pindex,
+       TSQLiteAux.CheckError(_SQLite3_Bind_Double(FInsertStmt, pindex,
          Field.AsFloat));
 
     ftBCD:
-       TSQLiteAux.CheckError(SQLite3_Bind_Double(FInsertStmt, pindex,
+       TSQLiteAux.CheckError(_SQLite3_Bind_Double(FInsertStmt, pindex,
          Field.AsFloat));
 
     else
@@ -386,7 +386,7 @@ begin
     while not DataSet.Eof do
     begin
       aux := GetTickCount;
-      SQLite3_Reset(Rec.InsertStmt);
+      _SQLite3_Reset(Rec.InsertStmt);
       s[0] := s[0] + (GetTickCount - aux);
 
       aux := GetTickCount;
@@ -397,7 +397,7 @@ begin
       s[1] := s[1] + (GetTickCount - aux);
 
       aux := GetTickCount;
-      Sqlite3_Step(Rec.InsertStmt);
+      _SQLite3_Step(Rec.InsertStmt);
       s[2] := s[2] + (GetTickCount - aux);
 
       Inc(Result);
@@ -514,7 +514,7 @@ begin
     StringReplace(':' + Fields, ', ', ', :', [rfReplaceAll]) + ')';
 
   if (Rec.InsertStmt <> nil) then
-    SQLite3_Finalize(Rec.InsertStmt);
+    _SQLite3_Finalize(Rec.InsertStmt);
   TSQLiteAux.PrepareSQL(SQL, Rec.InsertStmt);
 end;
 
@@ -533,10 +533,10 @@ end;
 
 initialization
   TemporaryTableID := 0;
-  if SQLite3_Open(':memory:', Database) <> 0 then
+  if _SQLite3_Open(':memory:', Database) <> 0 then
     raise Exception.Create('Can''t open memory database.');
 
 finalization
-  SQLite3_Close(Database);
+  _SQLite3_Close(Database);
 
 end.

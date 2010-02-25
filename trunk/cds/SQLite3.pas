@@ -1,3 +1,4 @@
+
 unit SQLite3;
 
 {
@@ -13,9 +14,11 @@ interface
 
 const
 
-  SQLiteDLL = 'sqlite3.dll';
+  //SQLiteDLL = 'sqlite3.dll';
 
 // Return values for sqlite3_exec() and sqlite3_step()
+
+  __turboFloat: integer = 0;
 
   SQLITE_OK = 0; // Successful result
   SQLITE_ERROR = 1; // SQL error or missing database
@@ -71,41 +74,42 @@ type
   TCollateXCompare = function(Userdta: pointer; Buf1Len: integer; Buf1: pointer;
     Buf2Len: integer; Buf2: pointer): integer; cdecl;
 
-function SQLite3_Open(dbname: PAnsiChar; var db: TSqliteDB): integer; cdecl; external SQLiteDLL name 'sqlite3_open';
-function SQLite3_Close(db: TSQLiteDB): integer; cdecl; external SQLiteDLL name 'sqlite3_close';
-function SQLite3_Exec(db: TSQLiteDB; SQLStatement: PAnsiChar; CallbackPtr: Pointer; Sender: TObject; var ErrMsg: PAnsiChar): integer; cdecl; external SQLiteDLL name 'sqlite3_exec';
-function SQLite3_Version(): PAnsiChar; cdecl; external SQLiteDLL name 'sqlite3_libversion';
-function SQLite3_ErrMsg(db: TSQLiteDB): PAnsiChar; cdecl; external SQLiteDLL name 'sqlite3_errmsg';
-function SQLite3_ErrCode(db: TSQLiteDB): integer; cdecl; external SQLiteDLL name 'sqlite3_errcode';
-procedure SQlite3_Free(P: PAnsiChar); cdecl; external SQLiteDLL name 'sqlite3_free';
-function SQLite3_GetTable(db: TSQLiteDB; SQLStatement: PAnsiChar; var ResultPtr: TSQLiteResult; var RowCount: Cardinal; var ColCount: Cardinal; var ErrMsg: PAnsiChar): integer; cdecl; external SQLiteDLL name 'sqlite3_get_table';
-procedure SQLite3_FreeTable(Table: TSQLiteResult); cdecl; external SQLiteDLL name 'sqlite3_free_table';
-function SQLite3_Complete(P: PAnsiChar): boolean; cdecl; external SQLiteDLL name 'sqlite3_complete';
-function SQLite3_LastInsertRowID(db: TSQLiteDB): Integer; cdecl; external SQLiteDLL name 'sqlite3_last_insert_rowid';
-procedure SQLite3_Interrupt(db: TSQLiteDB); cdecl; external SQLiteDLL name 'sqlite3_interrupt';
-procedure SQLite3_BusyHandler(db: TSQLiteDB; CallbackPtr: Pointer; Sender: TObject); cdecl; external SQLiteDLL name 'sqlite3_busy_handler';
-procedure SQLite3_BusyTimeout(db: TSQLiteDB; TimeOut: integer); cdecl; external SQLiteDLL name 'sqlite3_busy_timeout';
-function SQLite3_Changes(db: TSQLiteDB): integer; cdecl; external SQLiteDLL name 'sqlite3_changes';
-function SQLite3_TotalChanges(db: TSQLiteDB): integer; cdecl; external SQLiteDLL name 'sqlite3_total_changes';
-function SQLite3_Prepare(db: TSQLiteDB; SQLStatement: PAnsiChar; nBytes: integer; var hStmt: TSqliteStmt; var pzTail: PAnsiChar): integer; cdecl; external SQLiteDLL name 'sqlite3_prepare';
-function SQLite3_Prepare_v2(db: TSQLiteDB; SQLStatement: PAnsiChar; nBytes: integer; var hStmt: TSqliteStmt; var pzTail: PAnsiChar): integer; cdecl; external SQLiteDLL name 'sqlite3_prepare_v2';
-function SQLite3_ColumnCount(hStmt: TSqliteStmt): integer; cdecl; external SQLiteDLL name 'sqlite3_column_count';
-function Sqlite3_ColumnName(hStmt: TSqliteStmt; ColNum: integer): PAnsiChar; cdecl; external SQLiteDLL name 'sqlite3_column_name';
-function Sqlite3_ColumnDeclType(hStmt: TSqliteStmt; ColNum: integer): PAnsiChar; cdecl; external SQLiteDLL name 'sqlite3_column_decltype';
-function Sqlite3_Step(hStmt: TSqliteStmt): integer; cdecl; external SQLiteDLL name 'sqlite3_step';
-function SQLite3_DataCount(hStmt: TSqliteStmt): integer; cdecl; external SQLiteDLL name 'sqlite3_data_count';
+function _SQLite3_Open(dbname: PAnsiChar; var db: TSqliteDB): integer; cdecl; external;
+function _SQLite3_Close(db: TSQLiteDB): integer; cdecl; external;
+function _SQLite3_Exec(db: TSQLiteDB; SQLStatement: PAnsiChar; CallbackPtr: Pointer; Sender: TObject; var ErrMsg: PAnsiChar): integer; cdecl; external;
+function _SQLite3_Version(): PAnsiChar; cdecl; external;
+function _SQLite3_ErrMsg(db: TSQLiteDB): PAnsiChar; cdecl; external;
+function _SQLite3_ErrCode(db: TSQLiteDB): integer; cdecl; external;
+procedure _SQlite3_Free(P: PAnsiChar); cdecl; external;
+function _SQLite3_Get_Table(db: TSQLiteDB; SQLStatement: PAnsiChar; var ResultPtr: TSQLiteResult; var RowCount: Cardinal; var ColCount: Cardinal; var ErrMsg: PAnsiChar): integer; cdecl; external;
+procedure _SQLite3_Free_Table(Table: TSQLiteResult); cdecl; external;
+function _SQLite3_Complete(P: PAnsiChar): boolean; cdecl; external;
+function _SQLite3_Last_Insert_RowID(db: TSQLiteDB): Int64; cdecl; external;
+procedure _SQLite3_Interrupt(db: TSQLiteDB); cdecl; external;
+procedure _SQLite3_Busy_Handler(db: TSQLiteDB; CallbackPtr: Pointer; Sender: TObject); cdecl; external;
+procedure _SQLite3_Busy_Timeout(db: TSQLiteDB; TimeOut: integer); cdecl; external;
+function _SQLite3_Changes(db: TSQLiteDB): integer; cdecl; external;
+function _SQLite3_Total_Changes(db: TSQLiteDB): integer; cdecl; external;
+function _SQLite3_Prepare(db: TSQLiteDB; SQLStatement: PAnsiChar; nBytes: integer; var hStmt: TSqliteStmt; var pzTail: PAnsiChar): integer; cdecl; external;
+function _SQLite3_Prepare_v2(db: TSQLiteDB; SQLStatement: PAnsiChar; nBytes: integer; var hStmt: TSqliteStmt; var pzTail: PAnsiChar): integer; cdecl; external;
+function _SQLite3_Column_Count(hStmt: TSqliteStmt): integer; cdecl; external;
+function _Sqlite3_Column_Name(hStmt: TSqliteStmt; ColNum: integer): PAnsiChar; cdecl; external;
+function _Sqlite3_Column_DeclType(hStmt: TSqliteStmt; ColNum: integer): PAnsiChar; cdecl; external;
+function _Sqlite3_Step(hStmt: TSqliteStmt): integer; cdecl; external;
+function _SQLite3_Data_Count(hStmt: TSqliteStmt): integer; cdecl; external;
 
-function Sqlite3_ColumnTableName(hStmt: TSqliteStmt; ColNum: integer): PAnsiChar; cdecl; external SQLiteDLL name 'sqlite3_column_table_name';
+//function _Sqlite3_Column_TableName(hStmt: TSqliteStmt; ColNum: integer): PAnsiChar; cdecl; external;
 
-function Sqlite3_ColumnBlob(hStmt: TSqliteStmt; ColNum: integer): pointer; cdecl; external SQLiteDLL name 'sqlite3_column_blob';
-function Sqlite3_ColumnBytes(hStmt: TSqliteStmt; ColNum: integer): integer; cdecl; external SQLiteDLL name 'sqlite3_column_bytes';
-function Sqlite3_ColumnDouble(hStmt: TSqliteStmt; ColNum: integer): double; cdecl; external SQLiteDLL name 'sqlite3_column_double';
-function Sqlite3_ColumnInt(hStmt: TSqliteStmt; ColNum: integer): integer; cdecl; external SQLiteDLL name 'sqlite3_column_int';
-function Sqlite3_ColumnText(hStmt: TSqliteStmt; ColNum: integer): PAnsiChar; cdecl; external SQLiteDLL name 'sqlite3_column_text';
-function Sqlite3_ColumnType(hStmt: TSqliteStmt; ColNum: integer): integer; cdecl; external SQLiteDLL name 'sqlite3_column_type';
-function Sqlite3_ColumnInt64(hStmt: TSqliteStmt; ColNum: integer): Int64; cdecl; external SQLiteDLL name 'sqlite3_column_int64';
-function SQLite3_Finalize(hStmt: TSqliteStmt): integer; cdecl; external SQLiteDLL name 'sqlite3_finalize';
-function SQLite3_Reset(hStmt: TSqliteStmt): integer; cdecl; external SQLiteDLL name 'sqlite3_reset';
+function _Sqlite3_Column_Blob(hStmt: TSqliteStmt; ColNum: integer): pointer; cdecl; external;
+function _Sqlite3_Column_Bytes(hStmt: TSqliteStmt; ColNum: integer): integer; cdecl; external;
+function _Sqlite3_Column_Double(hStmt: TSqliteStmt; ColNum: integer): double; cdecl; external;
+function _Sqlite3_Column_Int(hStmt: TSqliteStmt; ColNum: integer): integer; cdecl; external;
+function _Sqlite3_Column_Text(hStmt: TSqliteStmt; ColNum: integer): PAnsiChar; cdecl; external;
+function _Sqlite3_Column_Type(hStmt: TSqliteStmt; ColNum: integer): integer; cdecl; external;
+function _Sqlite3_Column_Int64(hStmt: TSqliteStmt; ColNum: integer): Int64; cdecl; external;
+function _SQLite3_Finalize(hStmt: TSqliteStmt): integer; cdecl; external;
+function _SQLite3_Reset(hStmt: TSqliteStmt): integer; cdecl; external;
+function _SQLite3_Clear_Bindings(hStmt: TSqliteStmt): integer; cdecl; external;
 
 //
 // In the SQL strings input to sqlite3_prepare() and sqlite3_prepare16(),
@@ -131,38 +135,55 @@ function SQLite3_Reset(hStmt: TSqliteStmt): integer; cdecl; external SQLiteDLL n
 // as NULL.
 //
 
-function SQLite3_Bind_Blob(hStmt: TSqliteStmt; ParamNum: integer;
+function _SQLite3_Bind_Blob(hStmt: TSqliteStmt; ParamNum: integer;
   ptrData: pointer; numBytes: integer; ptrDestructor: pointer): integer;
-  cdecl; external SQLiteDLL name 'sqlite3_bind_blob';
-function SQLite3_Bind_Double(hStmt: TSqliteStmt; ParamNum: integer; Data: Double): integer;
-  cdecl; external SQLiteDLL name 'sqlite3_bind_double';
-function SQLite3_BindInt(hStmt: TSqLiteStmt; ParamNum: integer; intData: integer): integer;
-  cdecl; external 'sqlite3.dll' name 'sqlite3_bind_int';
-function SQLite3_Bind_int64(hStmt: TSqliteStmt; ParamNum: integer; Data: int64): integer;
-  cdecl; external SQLiteDLL name 'sqlite3_bind_int64';
-function SQLite3_Bind_null(hStmt: TSqliteStmt; ParamNum: integer): integer;
-  cdecl; external SQLiteDLL name 'sqlite3_bind_null';
-function SQLite3_Bind_text(hStmt: TSqliteStmt; ParamNum: integer;
+  cdecl; external;
+function _SQLite3_Bind_Double(hStmt: TSqliteStmt; ParamNum: integer; Data: Double): integer;
+  cdecl; external;
+function _SQLite3_Bind_Int(hStmt: TSqLiteStmt; ParamNum: integer; intData: integer): integer;
+  cdecl; external;
+function _SQLite3_Bind_int64(hStmt: TSqliteStmt; ParamNum: integer; Data: int64): integer;
+  cdecl; external;
+function _SQLite3_Bind_null(hStmt: TSqliteStmt; ParamNum: integer): integer;
+  cdecl; external;
+function _SQLite3_Bind_text(hStmt: TSqliteStmt; ParamNum: integer;
   Data: PAnsiChar; numBytes: integer; ptrDestructor: pointer): integer;
-  cdecl; external SQLiteDLL name 'sqlite3_bind_text';
+  cdecl; external;
 
-function SQLite3_Bind_Parameter_Index(hStmt: TSqliteStmt; zName: PAnsiChar): integer;
-  cdecl; external SQLiteDLL name 'sqlite3_bind_parameter_index';
+function _SQLite3_Bind_Parameter_Index(hStmt: TSqliteStmt; zName: PAnsiChar): integer;
+  cdecl; external;
 
-function sqlite3_enable_shared_cache(value: integer): integer; cdecl; external SQLiteDLL name 'sqlite3_enable_shared_cache';
+function _sqlite3_enable_shared_cache(value: integer): integer; cdecl; external;
 
 //user collate definiton
-function sqlite3_create_collation(db: TSQLiteDB; Name: PAnsiChar; eTextRep: integer;
-  UserData: pointer; xCompare: TCollateXCompare): integer; cdecl; external SQLiteDLL name 'sqlite3_create_collation';
+function _sqlite3_create_collation(db: TSQLiteDB; Name: PAnsiChar; eTextRep: integer;
+  UserData: pointer; xCompare: TCollateXCompare): integer; cdecl; external;
 
 
 function SQLiteFieldType(SQLiteFieldTypeCode: Integer): String;
 function SQLiteErrorStr(SQLiteErrorCode: Integer): String;
 
+
+function _atol(const s:PAnsiChar):integer; cdecl;external 'msvcrt.dll' name 'atol';
+function __ftol(f:double):integer; cdecl;external 'msvcrt.dll' name '_ftol';
+function __ftoul(f:double):longword; cdecl; external 'msvcrt.dll' name '_ftol';
+function _malloc(s:longword):pointer; cdecl;external 'msvcrt.dll' name 'malloc';
+procedure _free(p:pointer); cdecl;external 'msvcrt.dll' name 'free';
+function _realloc(p:pointer;s:longword):pointer; cdecl;external 'msvcrt.dll' name 'realloc';
+function _localtime(const __timer:pointer):pointer; cdecl;external 'msvcrt.dll' name 'localtime';
+
 implementation
 
 uses
-  SysUtils;
+  Windows, SysUtils;
+
+{$LINK sqlite3.obj}
+{$LINK _ll.obj}
+{$LINK strncmp.obj}
+{$LINK memset.obj}
+{$LINK memcpy.obj}
+{$LINK memmove.obj}
+{$LINK memcmp.obj}
 
 function SQLiteFieldType(SQLiteFieldTypeCode: Integer): String;
 begin
@@ -219,7 +240,7 @@ begin
   if (Value = nil) then
     Result := 'NULL'
   else
-    Result := PAnsiChar(Value);
+    Result := String(PAnsiChar(Value));
 end;
 
 
