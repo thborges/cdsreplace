@@ -101,7 +101,6 @@ object Form2: TForm2
       'IsolationLevel=ReadCommitted'
       'Trim Char=False')
     VendorLib = 'fbclient.dll'
-    Connected = True
     Left = 40
     Top = 80
   end
@@ -109,7 +108,7 @@ object Form2: TForm2
     MaxBlobSize = -1
     Params = <>
     SQL.Strings = (
-      'select first 100'
+      'select '
       '  EMP.CODI_EMP,'
       
         '  M.DEMI_NOT as DEMI, M.CODI_EMP, M.CODI_IND, M.DATA_VLR, TP.CMN' +
@@ -204,7 +203,7 @@ object Form2: TForm2
       '      AND pip.ITEM_INO = i.ITEM_INO) AS COMISSAO_TOTAL'
       ''
       'from INOTA I'
-      'left join CADEMP EMP on (1=0)'
+      'left join CADEMP EMP on (1=1)'
       'inner join NOTA M on (M.NPRE_NOT = I.NPRE_NOT)'
       
         'inner join FUNCAOTOPER FT on (FT.CODI_TOP = M.CODI_TOP and FT.CO' +

@@ -33,6 +33,7 @@ type
     FIndexFieldNames: String;
     FSelectAllStmt: TSQLiteStmt;
     FSelectOneStmt: TSQLiteStmt;
+    FLocateStmt: TSQLiteStmt;
     FRootRow: PRecordNode;
     FLastRow: PRecordNode;
     FCurrentRec: PRecordNode;
@@ -46,6 +47,7 @@ type
     FLocalDataSetToSQLiteBind: TDataSetToSQLiteBind;
     PDataSetRec: PInsertSQLiteRec;
     FLastBindedFieldData: array of Variant;
+    FLastLocateFields: String;
     function GetDataSetProvider: TSQLiteDataSetProvider;
     procedure SetDataSetProvider(const Value: TSQLiteDataSetProvider);
     procedure DoAfterGetRecords(var OwnerData: OleVariant);
@@ -208,7 +210,7 @@ var
   s: PAnsiChar;
   //fname: AnsiString;
 begin
-  index := Field.Index;
+  index := Field.FieldNo -1;
   Result := OpenCurrentRecord;
   if not Result and (State = dsInsert) then
   begin
@@ -222,7 +224,7 @@ begin
   end;
 
   //fname := UTF8String(Field.FieldName);
-  if not Result or (Sqlite3_ColumnType(FSelectOneStmt, index) = SQLITE_NULL) then
+  if not Result or (_SQLite3_Column_Type(FSelectOneStmt, index) = SQLITE_NULL) then
   begin
     Result := False;
     Exit;
@@ -231,37 +233,37 @@ begin
   case Field.DataType of
     ftString, ftWideString:
     begin
-      s := Sqlite3_ColumnText(FSelectOneStmt, index);
+      s := _SQLite3_Column_Text(FSelectOneStmt, index);
       Move(s[0], Buffer^, Length(s)+1);
     end;
 
     ftSmallInt, ftInteger:
     begin
-      i := Sqlite3_ColumnInt(FSelectOneStmt, index);
+      i := _SQLite3_Column_Int(FSelectOneStmt, index);
       Integer(Buffer^) := i;
     end;
 
     ftLargeint:
     begin
-      i64 := Sqlite3_ColumnInt64(FSelectOneStmt, index);
+      i64 := _Sqlite3_Column_Int64(FSelectOneStmt, index);
       Int64(Buffer^) := i64;
     end;
 
     ftFloat:
     begin
-      d := Sqlite3_ColumnDouble(FSelectOneStmt, index);
+      d := _Sqlite3_Column_Double(FSelectOneStmt, index);
       Double(Buffer^) := d;
     end;
 
     ftDate:
     begin
-      i := Sqlite3_ColumnInt(FSelectOneStmt, index);
+      i := _SQLite3_Column_Int(FSelectOneStmt, index);
       TDateTimeRec(Buffer^).Date := i;
     end;
 
     ftTime:
     begin
-      i := Sqlite3_ColumnInt(FSelectOneStmt, index);
+      i := _SQLite3_Column_Int(FSelectOneStmt, index);
       TDateTimeRec(Buffer^).Time := i;
     end;
 
@@ -346,10 +348,10 @@ begin
     if FSelectOneStmt = nil then
       OpenOneStmt
     else
-      TSQLiteAux.CheckError(SQLite3_Reset(FSelectOneStmt));
+      TSQLiteAux.CheckError(_SQLite3_Reset(FSelectOneStmt));
 
-    TSQLiteAux.CheckError(SQLite3_Bind_int64(FSelectOneStmt, 1, FCur.BdId));
-    if Sqlite3_Step(FSelectOneStmt) <> SQLITE_ROW then
+    TSQLiteAux.CheckError(_SQLite3_Bind_int64(FSelectOneStmt, 1, FCur.BdId));
+    if _SQLite3_Step(FSelectOneStmt) <> SQLITE_ROW then
       raise Exception.CreateFmt('Row %d not found', [FCur.BdId]);
     FCurrentOpenRec := FCur;
   end;
@@ -374,7 +376,7 @@ begin
   end
   else
   begin
-    if Assigned(PRecordBuffer(Buffer).Node) and Bof and Eof then
+    if Assigned(PRecordBuffer(Buffer).Node) and (FRecordCount = 0) then
     begin
       PRecordBuffer(Buffer).Node.Id := 0;
       PRecordBuffer(Buffer).Node.BdId := 0;
@@ -404,10 +406,12 @@ end;
 procedure TSQLiteClientDataSet.InternalClose;
 begin
   inherited;
-  SQLite3_Finalize(FSelectAllStmt);
+  _SQLite3_Finalize(FSelectAllStmt);
   FSelectAllStmt := nil;
-  SQLite3_Finalize(FSelectOneStmt);
+  _SQLite3_Finalize(FSelectOneStmt);
   FSelectOneStmt := nil;
+  _SQLite3_Finalize(FLocateStmt);
+  FLocateStmt := nil;
 
   FCursorOpen := False;
   FActualRecordId := 0;
@@ -422,9 +426,27 @@ procedure TSQLiteClientDataSet.InternalDelete;
 begin
   inherited;
   TSQLiteAux.ExecuteSQL('delete from ' + GetSQLiteTableName + ' where _ROWID_ = ' + IntToStr(fcurrentrec.BdId));
-  FCurrentRec.Prior.Next := FCurrentRec.Next;
-  FCurrentRec.Next.Prior := FCurrentRec.Prior;
+  if Assigned(FCurrentRec.Prior) then
+    FCurrentRec.Prior.Next := FCurrentRec.Next;
+  if Assigned(FCurrentRec.Next) then
+    FCurrentRec.Next.Prior := FCurrentRec.Prior;
+
   FCurrentRec := FCurrentRec.Next;
+
+  if Assigned(FCurrentRec) then
+  begin
+    if FCurrentRec.Prior = nil then
+      FRootRow := FCurrentRec;
+    if FCurrentRec.Next = nil then
+      FLastRow := FCurrentRec;
+  end
+  else
+  begin
+    FRootRow := nil;
+    FLastRow := nil;
+  end;
+
+  Dec(FRecordCount);
 end;
 
 procedure TSQLiteClientDataSet.InternalFirst;
@@ -487,9 +509,8 @@ begin
   inherited;
   PRecordBuffer(Buffer).BookFlag := bfCurrent;
   PRecordBuffer(Buffer).Node := nil;
-  SQLite3_Reset(PDataSetRec.InsertStmt);
-  for i := 1 to Fields.Count do
-    SQLite3_Bind_null(PDataSetRec.InsertStmt, i);
+  _SQLite3_Reset(PDataSetRec.InsertStmt);
+  _SQLite3_Clear_Bindings(PDataSetRec.InsertStmt);
 end;
 
 procedure TSQLiteClientDataSet.InternalInsert;
@@ -525,6 +546,7 @@ begin
 
   BuildRowIdIndex;
   FCursorOpen := True;
+  FLastLocateFields := '';
   FieldDefs.Updated := False;
   FieldDefs.Update;
   FieldDefList.Update;
@@ -536,13 +558,20 @@ end;
 procedure TSQLiteClientDataSet.InternalPost;
 var
   rowid: Int64;
+  NewRow: PRecordNode;
 begin
-  TSQLiteAux.CheckError(Sqlite3_Step(PDataSetRec.InsertStmt));
-  //rowid := SQLite3_LastInsertRowID(Database);
+  TSQLiteAux.CheckError(_SQLite3_Step(PDataSetRec.InsertStmt));
+  //rowid := _SQLite3_LastInsertRowID(Database);
 
   if State = dsInsert then
   begin
-    BuildRowIdIndex;
+    NewRow := AllocRecordRow(FLastRow);
+    NewRow.Id := FRecordCount + 1;
+    NewRow.BdId := _SQLite3_Last_Insert_RowID(Database);
+    FLastRow := NewRow;
+    if FRootRow = nil then
+      FRootRow := NewRow;
+    //BuildRowIdIndex;
   end;
 
   inherited;
@@ -577,16 +606,35 @@ function TSQLiteClientDataSet.Locate(const KeyFields: string;
       Fields.Delimiter := ';';
       Fields.DelimitedText := KeyFields;
       for i := 0 to Fields.Count - 1 do
+        Result := Result + Format(' and %s = :%d', [Fields[i], i])
+    finally
+      Fields.Free;
+    end;
+  end;
+
+  procedure SetParams;
+  var
+    Fields: TStringList;
+    i: Integer;
+    s: AnsiString;
+  begin
+    Fields := TStringList.Create;
+    try
+      Fields.Delimiter := ';';
+      Fields.DelimitedText := KeyFields;
+      for i := 0 to Fields.Count -1 do
       begin
-        if FieldByName(Fields[i]).DataType = ftDate then
-          Result := Result + Format(' and %s = %d', [Fields[i], DateTimeToTimeStamp(KeyValues[i]).Date])
-        else
         if KeyValues[i] = null then
-          Result := Result + Format(' and %s is null', [Fields[i]])
+          _SQLite3_Bind_null(FLocateStmt, i+1)
         else
-          Result := Result + Format(' and %s = %s', [Fields[i], QuotedStr(KeyValues[i])])
+        if TVarData(KeyValues[i]).VType = varDate then
+          _SQLite3_Bind_Int(FLocateStmt, i+1, DateTimeToTimeStamp(KeyValues[i]).Date)
+        else
+        begin
+          s := VarToStr(KeyValues[i]);
+          _SQLite3_Bind_text(FLocateStmt, i+1, @s[1], -1, SQLITE_TRANSIENT);
+        end;
       end;
-      //Result := Copy(Result, 1, Length(Result)-4);
     finally
       Fields.Free;
     end;
@@ -594,7 +642,6 @@ function TSQLiteClientDataSet.Locate(const KeyFields: string;
 
 var
   SQL: String;
-  FLocateStmt: TSQLiteStmt;
   CurrentRec: PRecordNode;
   BdId: Integer;
 begin
@@ -603,38 +650,38 @@ begin
   if RecordCount = 0 then
     Exit;
 
-  if VarIsArray(KeyValues) then
-    SQL := GenerateWhereLocate
-  else
-    SQL := Format('%s = ''%s''', [KeyFields, KeyValues]);
-
-  SQL := 'select _ROWID_ from ' + GetSQLiteTableName + SQL + GetSelectOrderBy;
-  //ShowMessage(SQL);
-
-  TSQLiteAux.PrepareSQL(SQL, FLocateStmt);
-  try
-    if Sqlite3_Step(FLocateStmt) <> SQLITE_ROW then
-      Result := False
+  if (FLastLocateFields <> KeyFields) then
+  begin
+    if VarIsArray(KeyValues) then
+      SQL := GenerateWhereLocate
     else
+      SQL := KeyFields + ' = :1';
+    SQL := 'select _ROWID_ from ' + GetSQLiteTableName + SQL + GetSelectOrderBy;
+    TSQLiteAux.PrepareSQL(SQL, FLocateStmt);
+    FLastLocateFields := KeyFields;
+  end
+  else
+    _SQLite3_Reset(FLocateStmt);
+
+  SetParams;
+  if _SQLite3_Step(FLocateStmt) <> SQLITE_ROW then
+    Result := False
+  else
+  begin
+    BdId := _SQLite3_Column_Int64(FLocateStmt, 0);
+    if BdId = 0 then
+      Exit;
+
+    CurrentRec := FRootRow;
+    while (CurrentRec <> nil) and (CurrentRec.BdId <> BdId) do
+      CurrentRec := CurrentRec.Next;
+
+    if Assigned(CurrentRec) then
     begin
-      BdId := Sqlite3_ColumnInt64(FLocateStmt, 0);
-      if BdId = 0 then
-        Exit;
-
-      CurrentRec := FRootRow;
-      while (CurrentRec <> nil) and (CurrentRec.BdId <> BdId) do
-        CurrentRec := CurrentRec.Next;
-
-      if Assigned(CurrentRec) then
-      begin
-        FCurrentRec := CurrentRec;
-        Resync([rmExact, rmCenter]);
-        Result := True;
-      end;
-
+      FCurrentRec := CurrentRec;
+      Resync([rmExact, rmCenter]);
+      Result := True;
     end;
-  finally
-    SQLite3_Finalize(FLocateStmt);
   end;
 end;
 
@@ -730,27 +777,27 @@ begin
   if not Assigned(FSelectAllStmt) then
     TSQLiteAux.PrepareSQL(SQL, FSelectAllStmt)
   else
-    SQLite3_Reset(FSelectAllStmt);
+    _SQLite3_Reset(FSelectAllStmt);
 
   if Assigned(DataSetField) then
     SetParamsFromMaster(FSelectAllStmt, DataSetField.DataSet);
 
   FRecordCount := 0;
   try
-    FetchResult := Sqlite3_Step(FSelectAllStmt);
+    FetchResult := _SQLite3_Step(FSelectAllStmt);
     while (FetchResult = SQLITE_ROW) do
     begin
       if (CurrentRow = nil) then
         CurrentRow := AllocRecordRow(PriorRow);
 
-      CurrentRow.BdId := Sqlite3_ColumnInt64(FSelectAllStmt, 0);
+      CurrentRow.BdId := _SQLite3_Column_Int64(FSelectAllStmt, 0);
       CurrentRow.Id := FRecordCount+1;
 
       PriorRow := CurrentRow;
       CurrentRow := CurrentRow.Next;
       Inc(FRecordCount);
 
-      FetchResult := Sqlite3_Step(FSelectAllStmt);
+      FetchResult := _SQLite3_Step(FSelectAllStmt);
     end;
 
     // Don't need this memory anymore
@@ -765,7 +812,7 @@ begin
     FCurrentOpenRec := nil;
 
   finally
-    TSQLiteAux.CheckError(SQLite3_Finalize(FSelectAllStmt));
+    TSQLiteAux.CheckError(_SQLite3_Finalize(FSelectAllStmt));
     FSelectAllStmt := nil;
   end;
 end;
@@ -855,50 +902,50 @@ var
 begin
   inherited;
   //pname := ':' + Field.FieldName;
-  //pindex := SQLite3_Bind_Parameter_Index(FInsertStmt, PAnsiChar(pname));
+  //pindex := _SQLite3_Bind_Parameter_Index(FInsertStmt, PAnsiChar(pname));
   pindex := Field.FieldNo;
 
 //  if Field.IsNull then
-//    TSQLiteAux.CheckError(SQLite3_Bind_null(PDataSetRec.InsertStmt, pindex))
+//    TSQLiteAux.CheckError(_SQLite3_Bind_null(PDataSetRec.InsertStmt, pindex))
 //  else
   case Field.DataType of
     ftString, ftWideString:
     begin
-       TSQLiteAux.CheckError(SQLite3_Bind_text(PDataSetRec.InsertStmt, pindex,
+       TSQLiteAux.CheckError(_SQLite3_Bind_text(PDataSetRec.InsertStmt, pindex,
          Buffer, -1, SQLITE_TRANSIENT));
        FLastBindedFieldData[pindex-1] := AnsiString(PAnsiChar(Buffer));
     end;
 
     ftOraBlob, ftOraClob, ftBytes, ftVarBytes, ftBlob, ftMemo, ftGraphic, ftFmtMemo:
-       TSQLiteAux.CheckError(SQLite3_Bind_Blob(PDataSetRec.InsertStmt, pindex,
+       TSQLiteAux.CheckError(_SQLite3_Bind_Blob(PDataSetRec.InsertStmt, pindex,
          Buffer, sizeof(Buffer), nil));
 
     ftSmallint, ftInteger, ftWord, ftBoolean:
     begin
-       TSQLiteAux.CheckError(SQLite3_BindInt(PDataSetRec.InsertStmt, pindex,
+       TSQLiteAux.CheckError(_SQLite3_Bind_Int(PDataSetRec.InsertStmt, pindex,
          PInteger(Buffer)^));
        FLastBindedFieldData[pindex-1] := PInteger(Buffer)^;
     end;
 
     ftTime:
-       TSQLiteAux.CheckError(SQLite3_BindInt(PDataSetRec.InsertStmt, pindex,
+       TSQLiteAux.CheckError(_SQLite3_Bind_Int(PDataSetRec.InsertStmt, pindex,
          DateTimeToTimeStamp(PDateTime(Buffer)^).Time));
 
     ftDate:
-       TSQLiteAux.CheckError(SQLite3_BindInt(PDataSetRec.InsertStmt, pindex,
+       TSQLiteAux.CheckError(_SQLite3_Bind_Int(PDataSetRec.InsertStmt, pindex,
          DateTimeToTimeStamp(PDateTime(Buffer)^).Date));
 
     ftLargeint:
-       TSQLiteAux.CheckError(SQLite3_Bind_int64(PDataSetRec.InsertStmt, pindex,
+       TSQLiteAux.CheckError(_SQLite3_Bind_int64(PDataSetRec.InsertStmt, pindex,
          PInt64(Buffer)^));
 
     ftDateTime, ftTimeStamp,
     ftFloat, ftCurrency:
-       TSQLiteAux.CheckError(SQLite3_Bind_Double(PDataSetRec.InsertStmt, pindex,
+       TSQLiteAux.CheckError(_SQLite3_Bind_Double(PDataSetRec.InsertStmt, pindex,
          PDouble(Buffer)^));
 
     ftBCD:
-       TSQLiteAux.CheckError(SQLite3_Bind_Double(PDataSetRec.InsertStmt, pindex,
+       TSQLiteAux.CheckError(_SQLite3_Bind_Double(PDataSetRec.InsertStmt, pindex,
          Field.AsFloat));
 
     else
@@ -907,8 +954,17 @@ begin
 end;
 
 procedure TSQLiteClientDataSet.SetIndexFieldNames(const Value: String);
+var
+  TableName: String;
 begin
-  FIndexFieldNames := Value;
+  if (FIndexFieldNames <> Value) then
+  begin
+    FIndexFieldNames := Value;
+    TableName := GetSQLiteTableName;
+    TSQLiteAux.ExecuteSQL('drop index if exists IndexFieldNames_' + TableName);
+    TSQLiteAux.ExecuteSQL(Format('create index IndexFieldNames_%s on %s (%s)',
+      [TableName, TableName, StringReplace(Value, ';', ',', [rfReplaceAll])]));
+  end;
 end;
 
 procedure TSQLiteClientDataSet.SetParams(const Value: TParams);
@@ -928,9 +984,9 @@ begin
   for i := 0 to Params.Count - 1 do
   begin
     pname := ':' + AnsiString(Params[i].Name);
-    pindex := SQLite3_Bind_Parameter_Index(stmt, PAnsiChar(pname));
+    pindex := _SQLite3_Bind_Parameter_Index(stmt, PAnsiChar(pname));
     pvalue := Master.FieldByName(Params[i].Name).AsAnsiString;
-    SQLite3_Bind_text(stmt, pindex, PAnsiChar(pvalue), -1, SQLITE_TRANSIENT);
+    _SQLite3_Bind_text(stmt, pindex, PAnsiChar(pvalue), -1, SQLITE_TRANSIENT);
   end;
 end;
 
