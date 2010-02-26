@@ -108,10 +108,11 @@ var
   Database: TSQLiteDB;
   TemporaryTableID: Int64;
   FIgnore: PAnsiChar;
+  FieldTempBuffer: TBlobByteData;
 
 implementation
 
-uses Dialogs, TypInfo;
+uses Dialogs, TypInfo, Math, FmtBCD;
 
 { TSiagriDataSetProvider }
 
@@ -212,63 +213,70 @@ end;
 class procedure TSQLiteAux.SetFieldData(FInsertStmt: TSQLiteStmt;
   Field: TField);
 var
-  pindex: Integer;
-  //pname: AnsiString;
+  pindex, BlobSize: Integer;
+  Null: Boolean;
   TimeStamp: TTimeStamp;
-  s8: AnsiString;
+  bcd: String;
 begin
   inherited;
-  //pname := ':' + Field.FieldName;
-  //pindex := _SQLite3_Bind_Parameter_Index(FInsertStmt, PAnsiChar(pname));
-  pindex := Field.Index + 1;
+  pindex := Field.FieldNo;
 
-  if Field.IsNull then
+  if Field.DataSize > Length(FieldTempBuffer) then
+    SetLength(FieldTempBuffer, Max(1024, Field.DataSize));
+
+  if Field.IsBlob then
+  begin
+    BlobSize := Field.DataSet.GetBlobFieldData(Field.FieldNo, FieldTempBuffer);
+    Null := BlobSize = 0;
+  end
+  else
+    Null := not Field.DataSet.GetFieldData(Field.FieldNo, @FieldTempBuffer[0]);
+
+  if Null then
     TSQLiteAux.CheckError(_SQLite3_Bind_null(FInsertStmt, pindex))
   else
   case Field.DataType of
     ftString, ftWideString:
     begin
-       s8 := Field.AsAnsiString;
        TSQLiteAux.CheckError(_SQLite3_Bind_text(FInsertStmt, pindex,
-         @s8[1], -1, SQLITE_TRANSIENT));
+         @FieldTempBuffer[0], -1, SQLITE_TRANSIENT));
     end;
 
     ftOraBlob, ftOraClob, ftBytes, ftVarBytes, ftBlob, ftMemo, ftGraphic, ftFmtMemo:
        TSQLiteAux.CheckError(_SQLite3_Bind_Blob(FInsertStmt, pindex,
-         {$IFDEF VER180}PAnsiChar(Field.AsAnsiString)
-         {$ELSE}@Field.AsBytes[0]
-         {$ENDIF}, Length(Field.AsString), nil));
+         @FieldTempBuffer[0], BlobSize, nil));
 
     ftSmallint, ftInteger, ftWord, ftBoolean:
        TSQLiteAux.CheckError(_SQLite3_Bind_Int(FInsertStmt, pindex,
-         Field.AsInteger));
+         PInteger(@FieldTempBuffer[0])^));
 
     ftLargeint:
        TSQLiteAux.CheckError(_SQLite3_Bind_int64(FInsertStmt, pindex,
-         Field.AsInteger));
+         PInt64(@FieldTempBuffer[0])^));
 
     ftTime:
     begin
-      TimeStamp := DateTimeToTimeStamp(Field.AsDateTime);
       TSQLiteAux.CheckError(_SQLite3_Bind_Int(FInsertStmt, pindex,
-         TimeStamp.Time));
+         PInteger(@FieldTempBuffer[0])^));
     end;
 
     ftDate:
     begin
-      TimeStamp := DateTimeToTimeStamp(Field.AsDateTime);
       TSQLiteAux.CheckError(_SQLite3_Bind_Int(FInsertStmt, pindex,
-         TimeStamp.Date));
+         PInteger(@FieldTempBuffer[0])^));
     end;
 
     ftDateTime, ftTimeStamp,
     ftFloat, ftCurrency:
        TSQLiteAux.CheckError(_SQLite3_Bind_Double(FInsertStmt, pindex,
-         Field.AsFloat));
+         PDouble(@FieldTempBuffer[0])^));
 
-    ftBCD:
-       TSQLiteAux.CheckError(_SQLite3_Bind_Double(FInsertStmt, pindex,
-         Field.AsFloat));
+    ftBCD, ftFMTBcd:
+    begin
+       bcd := BcdToStr(PBcd(@FieldTempBuffer[0])^);
+       TSQLiteAux.CheckError(_SQLite3_Bind_text(FInsertStmt, pindex,
+         @bcd[1], -1, SQLITE_TRANSIENT));
+    end;
 
     else
       raise Exception.Create('Field type not supported');
@@ -343,11 +351,10 @@ end;
 function TSiagriDataPacketWriter.WriteDataSet(DataSet: TDataSet; var Info: TInfoArray; RecsOut: Integer): Integer;
 
 var
-  i, aux, count: Integer;
+  i, count: Integer;
   Rec: PInsertSQLiteRec;
   Details: TList;
   HasDetails: Boolean;
-  s: array of integer;
 
   function OpenCloseDetails(Info: TInfoArray; ActiveState: Boolean): Boolean;
   var
@@ -379,26 +386,18 @@ begin
     DataSet.GetDetailDataSets(Details);
     HasDetails := Details.Count > 0;
 
-    SetLength(s, DataSet.FieldCount);
-    FillChar(s[0], sizeof(integer)*Length(s), 0);
     count := DataSet.FieldCount;
 
     while not DataSet.Eof do
     begin
-      aux := GetTickCount;
       _SQLite3_Reset(Rec.InsertStmt);
-      s[0] := s[0] + (GetTickCount - aux);
 
-      aux := GetTickCount;
       for i := 0 to count - 1 do
       begin
         TSQLiteAux.SetFieldData(Rec.InsertStmt, DataSet.Fields[i]);
       end;
-      s[1] := s[1] + (GetTickCount - aux);
 
-      aux := GetTickCount;
       _SQLite3_Step(Rec.InsertStmt);
-      s[2] := s[2] + (GetTickCount - aux);
 
       Inc(Result);
 
@@ -407,9 +406,7 @@ begin
 
       if Result < RecsOut then
       begin
-        aux := GetTickCount;
         DataSet.Next;
-        s[3] := s[3] + (GetTickCount - aux);
       end;
     end;
 

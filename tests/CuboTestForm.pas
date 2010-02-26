@@ -920,24 +920,28 @@ end;
 procedure TForm2.Button1Click(Sender: TObject);
 var
   a: Int64;
+  before: Int64;
 begin
   a := GetTickCount;
   cdsTemp.CreateDataSet;
   cdsVendas.Open;
+  before := GetTickCount - a;
   cdsVendas.LogChanges := False;
   AtualizaValores;
-  ShowMessage(IntToStr(GetTickCount - a) + '-' + IntToStr(TotTime));
+  ShowMessage('Total: ' + IntToStr(GetTickCount - a) + ' Banco: ' + IntToStr(before));
 end;
 
 procedure TForm2.Button2Click(Sender: TObject);
 var
   a: Int64;
+  before: Int64;
 begin
   a := GetTickCount;
   sqcTemp.CreateDataSet;
   sqcVendas.Open;
+  before := GetTickCount - a;
   AtualizaValores2;
-  ShowMessage(IntToStr(GetTickCount - a) + '-' + IntToStr(TotTime));
+  ShowMessage('Total: ' + IntToStr(GetTickCount - a) + ' Banco: ' + IntToStr(before));
 end;
 
 procedure TForm2.FormCreate(Sender: TObject);
@@ -950,10 +954,11 @@ begin
       if (clbEntidades.Items[lIndex] = 'Empresas') or
          (clbEntidades.Items[lIndex] = 'Vendedor 1') or
          (clbEntidades.Items[lIndex] = 'Clientes') or
-         (clbEntidades.Items[lIndex] = 'Materiais') or
-         (clbEntidades.Items[lIndex] = 'Grupos/SugGrupos de Material') or
+//         (clbEntidades.Items[lIndex] = 'Materiais') or
+//         (clbEntidades.Items[lIndex] = 'Grupos/SugGrupos de Material') or
          (clbEntidades.Items[lIndex] = 'Ano') or
-         (clbEntidades.Items[lIndex] = 'Mês') then
+         (clbEntidades.Items[lIndex] = 'Mês')
+      then
          clbEntidades.Checked[lIndex] := True
       else
          clbEntidades.Checked[lIndex] := False;
@@ -1158,13 +1163,14 @@ var
 
 begin
 
- RetornaIndexFields(demi, codi_emp, codi_pes, cod2_pes, codi_tra,
+    RetornaIndexFields(demi, codi_emp, codi_pes, cod2_pes, codi_tra,
             codi_for, codi_gpr, codi_sbg, codi_tip, codi_ctf,
             codi_ctc, codi_rot, codi_reg, codi_mun, codi_cic,
             cond_con, codi_top, codi_psv, esta_mun, ccfo_cfo, codi_cul,
             lNomeIndexFields, lNomeFields, lValueFields, lQtdeCampos, doc_Serie);
 
-    sqcVendas.Locate(lNomeIndexFields, lValueFields, []);
+    if not sqcVendas.Locate(lNomeIndexFields, lValueFields, []) then
+      ShowMessage('Teste');
 
     while CheckDados do
     begin
@@ -1274,7 +1280,8 @@ begin
        end;
 
        AuxTime := GetTickCount;
-       sqcVendas.Delete;
+       if not sqcVendas.IsEmpty then
+         sqcVendas.Delete;
        TotTime := TotTime + (GetTickCount - AuxTime);
     end;
 end;
