@@ -47,7 +47,8 @@ type
     FLocalDataSetToSQLiteBind: TDataSetToSQLiteBind;
     PDataSetRec: PInsertSQLiteRec;
     FLastBindedFieldData: array of Variant;
-    FLastLocateFields: String;
+    FLastLocateFields: TStrings;
+    FLastLocateFieldsStr: String;
     function GetDataSetProvider: TSQLiteDataSetProvider;
     procedure SetDataSetProvider(const Value: TSQLiteDataSetProvider);
     procedure DoAfterGetRecords(var OwnerData: OleVariant);
@@ -204,6 +205,8 @@ begin
 end;
 
 function TSQLiteClientDataSet.GetFieldData(Field: TField; Buffer: Pointer): Boolean;
+type
+  PDateTimeRec = ^TDateTimeRec;
 var
   i, i64, index: Int64;
   d: Double;
@@ -258,13 +261,15 @@ begin
     ftDate:
     begin
       i := _SQLite3_Column_Int(FSelectOneStmt, index);
-      TDateTimeRec(Buffer^).Date := i;
+      PDateTimeRec(Buffer).Time := 0;
+      PDateTimeRec(Buffer).Date := i;
     end;
 
     ftTime:
     begin
       i := _SQLite3_Column_Int(FSelectOneStmt, index);
-      TDateTimeRec(Buffer^).Time := i;
+      PDateTimeRec(Buffer).Date := 0;
+      PDateTimeRec(Buffer).Time := i;
     end;
 
     else
@@ -546,7 +551,8 @@ begin
 
   BuildRowIdIndex;
   FCursorOpen := True;
-  FLastLocateFields := '';
+  FLastLocateFields := nil;
+  FLastLocateFieldsStr := '';
   FieldDefs.Updated := False;
   FieldDefs.Update;
   FieldDefList.Update;
@@ -597,46 +603,30 @@ function TSQLiteClientDataSet.Locate(const KeyFields: string;
 
   function GenerateWhereLocate: String;
   var
-    Fields: TStringList;
     i: Integer;
   begin
     Result := GetWhereClause;
-    Fields := TStringList.Create;
-    try
-      Fields.Delimiter := ';';
-      Fields.DelimitedText := KeyFields;
-      for i := 0 to Fields.Count - 1 do
-        Result := Result + Format(' and %s = :%d', [Fields[i], i])
-    finally
-      Fields.Free;
-    end;
+    for i := 0 to FLastLocateFields.Count - 1 do
+      Result := Result + Format(' and %s = :%d', [FLastLocateFields[i], i])
   end;
 
   procedure SetParams;
   var
-    Fields: TStringList;
     i: Integer;
     s: AnsiString;
   begin
-    Fields := TStringList.Create;
-    try
-      Fields.Delimiter := ';';
-      Fields.DelimitedText := KeyFields;
-      for i := 0 to Fields.Count -1 do
+    for i := 0 to FLastLocateFields.Count -1 do
+    begin
+      if KeyValues[i] = null then
+        _SQLite3_Bind_null(FLocateStmt, i+1)
+      else
+      if TVarData(KeyValues[i]).VType = varDate then
+        _SQLite3_Bind_Int(FLocateStmt, i+1, DateTimeToTimeStamp(KeyValues[i]).Date)
+      else
       begin
-        if KeyValues[i] = null then
-          _SQLite3_Bind_null(FLocateStmt, i+1)
-        else
-        if TVarData(KeyValues[i]).VType = varDate then
-          _SQLite3_Bind_Int(FLocateStmt, i+1, DateTimeToTimeStamp(KeyValues[i]).Date)
-        else
-        begin
-          s := VarToStr(KeyValues[i]);
-          _SQLite3_Bind_text(FLocateStmt, i+1, @s[1], -1, SQLITE_TRANSIENT);
-        end;
+        s := VarToStr(KeyValues[i]);
+        _SQLite3_Bind_text(FLocateStmt, i+1, @s[1], -1, SQLITE_TRANSIENT);
       end;
-    finally
-      Fields.Free;
     end;
   end;
 
@@ -650,15 +640,20 @@ begin
   if RecordCount = 0 then
     Exit;
 
-  if (FLastLocateFields <> KeyFields) then
+  if not Assigned(FLastLocateFields) or (FLastLocateFieldsStr <> KeyFields) then
   begin
+    if not Assigned(FLastLocateFields) then
+      FLastLocateFields := TStringList.Create;
+    FLastLocateFields.Delimiter := ';';
+    FLastLocateFields.DelimitedText := KeyFields;
+    FLastLocateFieldsStr := KeyFields;
+
     if VarIsArray(KeyValues) then
       SQL := GenerateWhereLocate
     else
       SQL := KeyFields + ' = :1';
     SQL := 'select _ROWID_ from ' + GetSQLiteTableName + SQL + GetSelectOrderBy;
     TSQLiteAux.PrepareSQL(SQL, FLocateStmt);
-    FLastLocateFields := KeyFields;
   end
   else
     _SQLite3_Reset(FLocateStmt);
@@ -858,6 +853,8 @@ destructor TSQLiteClientDataSet.Destroy;
 begin
   DestroyRecordList(FRootRow);
   FParams.Free;
+  if Assigned(FLastLocateFields) then
+    FLastLocateFields.Free;
   if Assigned(FLocalDataSetToSQLiteBind) then
     FLocalDataSetToSQLiteBind.Free;
   inherited;

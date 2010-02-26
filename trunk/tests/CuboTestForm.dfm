@@ -108,7 +108,7 @@ object Form2: TForm2
     MaxBlobSize = -1
     Params = <>
     SQL.Strings = (
-      'select '
+      'select first 50'
       '  EMP.CODI_EMP,'
       
         '  M.DEMI_NOT as DEMI, M.CODI_EMP, M.CODI_IND, M.DATA_VLR, TP.CMN' +
