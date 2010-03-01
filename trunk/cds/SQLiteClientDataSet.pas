@@ -49,6 +49,7 @@ type
     FLastBindedFieldData: array of Variant;
     FLastLocateFields: TStrings;
     FLastLocateFieldsStr: String;
+    FMaxRecordId: Integer;
     function GetDataSetProvider: TSQLiteDataSetProvider;
     procedure SetDataSetProvider(const Value: TSQLiteDataSetProvider);
     procedure DoAfterGetRecords(var OwnerData: OleVariant);
@@ -139,7 +140,7 @@ procedure Register;
 
 implementation
 
-uses StrUtils, Variants, Dialogs, Windows;
+uses StrUtils, Variants, Math, Windows;
 
 procedure Register;
 begin
@@ -287,7 +288,7 @@ begin
     case GetMode of
       gmNext:
       begin
-        if FActualRecordId >= RecordCount then
+        if FActualRecordId >= FMaxRecordId then
           Result := grEOF
         else begin
           Inc(FActualRecordId);
@@ -309,7 +310,7 @@ begin
         end
         else begin
           Dec(FActualRecordId);
-          if FActualRecordId = RecordCount then
+          if FActualRecordId = FMaxRecordId then
             FCurrentRec := FLastRow
           else
             FCurrentRec := FCurrentRec.Prior;
@@ -317,7 +318,7 @@ begin
       end;
 
       gmCurrent:
-        if (FActualRecordId <= 0) or (FActualRecordId > RecordCount) then
+        if (FActualRecordId <= 0) or (FActualRecordId > FMaxRecordId) then
           Result := grError
         else
         if not Assigned(FCurrentRec) then
@@ -437,6 +438,10 @@ begin
     FCurrentRec.Next.Prior := FCurrentRec.Prior;
 
   FCurrentRec := FCurrentRec.Next;
+  if Assigned(FCurrentRec) then
+    FActualRecordId := FCurrentRec.Id
+  else
+    FActualRecordId := 0;
 
   if Assigned(FCurrentRec) then
   begin
@@ -450,6 +455,9 @@ begin
     FRootRow := nil;
     FLastRow := nil;
   end;
+
+  if Assigned(FLastRow) then
+    FMaxRecordId := FLastRow.Id;
 
   Dec(FRecordCount);
 end;
@@ -530,7 +538,7 @@ end;
 procedure TSQLiteClientDataSet.InternalLast;
 begin
   inherited;
-  FActualRecordId := RecordCount+1;
+  FActualRecordId := FMaxRecordId+1;
   FCurrentRec := nil;
 end;
 
@@ -540,6 +548,7 @@ var
 begin
   inherited;
   RecsOut := 0;
+  FMaxRecordId := 0;
   if Assigned(FDataSetProvider) then
     FDataSetToSQLiteBind := Pointer(Integer(DoGetRecords(-1, RecsOut)))
   else
@@ -572,11 +581,18 @@ begin
   if State = dsInsert then
   begin
     NewRow := AllocRecordRow(FLastRow);
-    NewRow.Id := FRecordCount + 1;
+    if Assigned(FLastRow) then
+      NewRow.Id := FLastRow.Id + 1
+    else
+      NewRow.Id := 1;
     NewRow.BdId := _SQLite3_Last_Insert_RowID(Database);
     FLastRow := NewRow;
     if FRootRow = nil then
       FRootRow := NewRow;
+    Inc(FRecordCount);
+    FCurrentRec := NewRow;
+    FActualRecordId := FCurrentRec.Id;
+    FMaxRecordId := FLastRow.Id;
     //BuildRowIdIndex;
   end;
 
@@ -612,7 +628,7 @@ function TSQLiteClientDataSet.Locate(const KeyFields: string;
 
   procedure SetParams;
   var
-    i: Integer;
+    i,j: Integer;
     s: AnsiString;
   begin
     for i := 0 to FLastLocateFields.Count -1 do
@@ -621,7 +637,10 @@ function TSQLiteClientDataSet.Locate(const KeyFields: string;
         _SQLite3_Bind_null(FLocateStmt, i+1)
       else
       if TVarData(KeyValues[i]).VType = varDate then
-        _SQLite3_Bind_Int(FLocateStmt, i+1, DateTimeToTimeStamp(KeyValues[i]).Date)
+      begin
+        j := DateTimeToTimeStamp(KeyValues[i]).Date;
+        _SQLite3_Bind_Int(FLocateStmt, i+1, j)
+      end
       else
       begin
         s := VarToStr(KeyValues[i]);
@@ -670,6 +689,8 @@ begin
     CurrentRec := FRootRow;
     while (CurrentRec <> nil) and (CurrentRec.BdId <> BdId) do
       CurrentRec := CurrentRec.Next;
+
+    FActualRecordId := CurrentRec.Id;
 
     if Assigned(CurrentRec) then
     begin
@@ -805,6 +826,10 @@ begin
     FLastRow := PriorRow;
     FCurrentRec := nil;
     FCurrentOpenRec := nil;
+    if Assigned(FlastRow) then
+      FMaxRecordId := FLastRow.Id
+    else
+      FMaxRecordId := 0;
 
   finally
     TSQLiteAux.CheckError(_SQLite3_Finalize(FSelectAllStmt));
