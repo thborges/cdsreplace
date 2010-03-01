@@ -5,7 +5,8 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, WideStrings, DBXFirebird, FMTBcd, StdCtrls, SQLiteClientDataSet,
-  SQLiteDataSetProvider, DBClient, Provider, DB, SqlExpr, CheckLst, ComCtrls;
+  SQLiteDataSetProvider, DBClient, Provider, DB, SqlExpr, CheckLst, ComCtrls,
+  Grids, DBGrids;
 
 type
   TForm2 = class(TForm)
@@ -247,6 +248,10 @@ type
     sqcTempCOMISSAO_TOTAL: TFloatField;
     sqcTempDESPESAS: TFloatField;
     sqcTempDOC_SERIE: TStringField;
+    DBGrid1: TDBGrid;
+    DataSource1: TDataSource;
+    DBGrid2: TDBGrid;
+    DataSource2: TDataSource;
     procedure Button1Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure Button2Click(Sender: TObject);
@@ -1170,7 +1175,7 @@ begin
             lNomeIndexFields, lNomeFields, lValueFields, lQtdeCampos, doc_Serie);
 
     if not sqcVendas.Locate(lNomeIndexFields, lValueFields, []) then
-      ShowMessage('Teste');
+       Abort;
 
     while CheckDados do
     begin

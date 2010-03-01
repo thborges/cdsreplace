@@ -15,9 +15,6 @@
 			<Projects Include="AppendRecord.dproj">
 				<Dependencies/>
 			</Projects>
-			<Projects Include="..\..\sqlite-3.6.22\sqlite_3_6_22.cbproj">
-				<Dependencies/>
-			</Projects>
 		</ItemGroup>
 		<ProjectExtensions>
 			<Borland.Personality>Default.Personality.12</Borland.Personality>
@@ -62,23 +59,14 @@
 		<Target Name="AppendRecord:Make">
 			<MSBuild Targets="Make" Projects="AppendRecord.dproj"/>
 		</Target>
-		<Target Name="sqlite_3_6_22">
-			<MSBuild Projects="..\..\sqlite-3.6.22\sqlite_3_6_22.cbproj"/>
-		</Target>
-		<Target Name="sqlite_3_6_22:Clean">
-			<MSBuild Targets="Clean" Projects="..\..\sqlite-3.6.22\sqlite_3_6_22.cbproj"/>
-		</Target>
-		<Target Name="sqlite_3_6_22:Make">
-			<MSBuild Targets="Make" Projects="..\..\sqlite-3.6.22\sqlite_3_6_22.cbproj"/>
-		</Target>
 		<Target Name="Build">
-			<CallTarget Targets="Project1;Project10;CuboTest;AppendRecord;sqlite_3_6_22"/>
+			<CallTarget Targets="Project1;Project10;CuboTest;AppendRecord"/>
 		</Target>
 		<Target Name="Clean">
-			<CallTarget Targets="Project1:Clean;Project10:Clean;CuboTest:Clean;AppendRecord:Clean;sqlite_3_6_22:Clean"/>
+			<CallTarget Targets="Project1:Clean;Project10:Clean;CuboTest:Clean;AppendRecord:Clean"/>
 		</Target>
 		<Target Name="Make">
-			<CallTarget Targets="Project1:Make;Project10:Make;CuboTest:Make;AppendRecord:Make;sqlite_3_6_22:Make"/>
+			<CallTarget Targets="Project1:Make;Project10:Make;CuboTest:Make;AppendRecord:Make"/>
 		</Target>
 		<Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 	</Project>

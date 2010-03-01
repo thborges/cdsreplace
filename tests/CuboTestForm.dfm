@@ -3,7 +3,7 @@ object Form2: TForm2
   Top = 0
   Caption = 'Form2'
   ClientHeight = 451
-  ClientWidth = 463
+  ClientWidth = 708
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -15,8 +15,8 @@ object Form2: TForm2
   PixelsPerInch = 96
   TextHeight = 13
   object Button1: TButton
-    Left = 344
-    Top = 48
+    Left = 476
+    Top = 418
     Width = 75
     Height = 25
     Caption = 'Client'
@@ -24,8 +24,8 @@ object Form2: TForm2
     OnClick = Button1Click
   end
   object Button2: TButton
-    Left = 344
-    Top = 79
+    Left = 557
+    Top = 418
     Width = 75
     Height = 25
     Caption = 'Sqlite'
@@ -76,6 +76,32 @@ object Form2: TForm2
     Height = 17
     Step = 1
     TabOrder = 3
+  end
+  object DBGrid1: TDBGrid
+    Left = 239
+    Top = 219
+    Width = 444
+    Height = 205
+    DataSource = DataSource1
+    TabOrder = 4
+    TitleFont.Charset = DEFAULT_CHARSET
+    TitleFont.Color = clWindowText
+    TitleFont.Height = -11
+    TitleFont.Name = 'Tahoma'
+    TitleFont.Style = []
+  end
+  object DBGrid2: TDBGrid
+    Left = 239
+    Top = 8
+    Width = 444
+    Height = 205
+    DataSource = DataSource2
+    TabOrder = 5
+    TitleFont.Charset = DEFAULT_CHARSET
+    TitleFont.Color = clWindowText
+    TitleFont.Height = -11
+    TitleFont.Name = 'Tahoma'
+    TitleFont.Style = []
   end
   object SQLConnection2: TSQLConnection
     ConnectionName = 'FBConnection'
@@ -1054,5 +1080,15 @@ object Form2: TForm2
     object sqcTempDOC_SERIE: TStringField
       FieldName = 'DOC_SERIE'
     end
+  end
+  object DataSource1: TDataSource
+    DataSet = cdsTemp
+    Left = 368
+    Top = 264
+  end
+  object DataSource2: TDataSource
+    DataSet = sqcTemp
+    Left = 552
+    Top = 56
   end
 end

@@ -213,7 +213,7 @@ end;
 class procedure TSQLiteAux.SetFieldData(FInsertStmt: TSQLiteStmt;
   Field: TField);
 var
-  pindex, BlobSize: Integer;
+  pindex, BlobSize, date: Integer;
   Null: Boolean;
   TimeStamp: TTimeStamp;
   bcd: String;
@@ -262,8 +262,9 @@ begin
 
     ftDate:
     begin
+      date := PInteger(@FieldTempBuffer[0])^;
       TSQLiteAux.CheckError(_SQLite3_Bind_Int(FInsertStmt, pindex,
-         PInteger(@FieldTempBuffer[0])^));
+         date));
     end;
 
     ftDateTime, ftTimeStamp,
